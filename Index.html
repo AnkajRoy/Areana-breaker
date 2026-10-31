@@ -1,0 +1,2187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-select=no, viewport-fit=cover">
+<title>Arena Breaker</title>
+<style>
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #0b1120;
+    color: #f8fafc;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: none;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: env(safe-area-inset-top, 8px) 10px env(safe-area-inset-bottom, 8px) 10px;
+    height: 100dvh;
+    min-height: 100vh;
+  }
+  .game-container {
+    width: 100%;
+    max-width: 800px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    user-select: none;
+    touch-action: none;
+  }
+  header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 2px 6px 2px;
+    flex-shrink: 0;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #38bdf8;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+  }
+  .mode-badge {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+  }
+  .header-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .nav-btn {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #f8fafc;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.1s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  .nav-btn:hover { background: #334155; border-color: #38bdf8; }
+  .nav-btn:active { transform: scale(0.96); background: #475569; }
+
+  /* Dynamic HUD */
+  .hud {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .hud.hud-duel { grid-template-columns: repeat(2, 1fr); }
+  .hud-card {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid #334155;
+    padding: 5px 8px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .hud-label {
+    color: #94a3b8;
+    font-size: 10px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .hud-val {
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+  }
+  #coins-val { color: #facc15; }
+  #hp-val { color: #4ade80; }
+  #p2-val { color: #f59e0b; }
+  #wave-val { color: #f43f5e; }
+  #level-val { color: #a855f7; }
+
+  /* Flexible Arena Wrapper */
+  .canvas-wrapper {
+    position: relative;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 220px;
+    max-height: calc(100dvh - 230px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    background: #1e293b;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    touch-action: none;
+  }
+  .damage-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 12px;
+    box-shadow: inset 0 0 25px 8px rgba(239, 68, 68, 0.65);
+    opacity: 0;
+    transition: opacity 0.08s ease-out;
+    z-index: 10;
+  }
+  .damage-flash.active { opacity: 1; }
+
+  /* Modals - Cleanly Sized & Scroll-Safe */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 17, 32, 0.95);
+    border-radius: 12px;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    text-align: center;
+    z-index: 30;
+    backdrop-filter: blur(6px);
+    overflow-y: auto;
+    max-height: 100%;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 4px 0;
+    color: #38bdf8;
+    text-shadow: 0 2px 10px rgba(56, 189, 248, 0.4);
+  }
+  .modal-subtitle {
+    color: #94a3b8;
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    max-width: 440px;
+    line-height: 1.35;
+  }
+  .menu-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 380px;
+    margin-bottom: 8px;
+  }
+  .menu-btn {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid #475569;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    transition: all 0.15s;
+    text-align: left;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.25);
+  }
+  .menu-btn:hover {
+    background: #334155;
+    border-color: #38bdf8;
+    transform: translateY(-1px);
+  }
+  .menu-btn:active { transform: scale(0.98); }
+  .menu-btn span {
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+  .difficulty-picker {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0 12px 0;
+  }
+  .diff-btn {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .diff-btn.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: white;
+  }
+
+  .upgrade-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 12px;
+  }
+  .upgrade-card {
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .upgrade-name {
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+  .upgrade-stat {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+  }
+  .btn-buy {
+    background: #0284c7;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 6px 8px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s;
+  }
+  .btn-buy:hover:not(:disabled) { background: #0369a1; }
+  .btn-buy:disabled {
+    background: #334155;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: #22c55e;
+    color: white;
+    font-weight: 800;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 22px;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+    transition: all 0.12s;
+  }
+  .btn-primary:hover { background: #16a34a; }
+  .btn-primary:active { transform: scale(0.96); }
+  .btn-secondary {
+    background: #334155;
+    color: #cbd5e1;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-secondary:hover { background: #475569; color: white; }
+  .btn-secondary:active { transform: scale(0.96); }
+
+  /* Controls Panel - Seamless Thumb Ergonomics */
+  .controls-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 580px;
+    margin-top: 8px;
+    padding: 0 12px;
+    touch-action: none;
+    flex-shrink: 0;
+  }
+  .joystick-zone {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+  }
+  .joystick-base {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border: 2px solid rgba(148, 163, 184, 0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(56, 189, 248, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    touch-action: none;
+  }
+  .joystick-knob {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #22c55e 0%, #15803d 80%, #14532d 100%);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    border: 2px solid #bbf7d0;
+    position: absolute;
+    transform: translate(0px, 0px);
+    pointer-events: none;
+    transition: transform 0.05s ease-out;
+  }
+  .joystick-knob.dragging { transition: none; }
+
+  .action-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    touch-action: none;
+  }
+  #attack-btn {
+    width: 104px;
+    height: 104px;
+    background: radial-gradient(circle at 35% 35%, #ef4444 0%, #dc2626 70%, #991b1b 100%);
+    border: 3px solid #fca5a5;
+    color: white;
+    border-radius: 50%;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(220, 38, 38, 0.45), inset 0 2px 6px rgba(255, 255, 255, 0.4);
+    touch-action: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #attack-btn span {
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.9;
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+  #attack-btn:active, #attack-btn.active {
+    background: radial-gradient(circle at 35% 35%, #dc2626 0%, #b91c1c 80%, #7f1d1d 100%);
+    transform: scale(0.94);
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.7);
+  }
+
+  .footer-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 6px;
+    margin-bottom: 2px;
+    flex-shrink: 0;
+  }
+  .instructions-bar {
+    color: #64748b;
+    font-size: 11px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <header>
+    <div class="header-left">
+      <h1>ARENA BREAKER</h1>
+      <span id="current-mode-badge" class="mode-badge">Campaign</span>
+    </div>
+    <div class="header-actions">
+      <button id="pause-btn" class="nav-btn">Pause</button>
+      <button id="menu-btn" class="nav-btn">Modes</button>
+      <button id="sound-btn" class="nav-btn">Sound: ON</button>
+    </div>
+  </header>
+
+  <!-- Dynamic HUD -->
+  <div id="hud-bar" class="hud">
+    <div class="hud-card" id="card-col1">
+      <span class="hud-label" id="label-col1">Arena Level</span>
+      <span id="level-val" class="hud-val">1</span>
+    </div>
+    <div class="hud-card" id="card-col2">
+      <span class="hud-label" id="label-col2">Wave</span>
+      <span id="wave-val" class="hud-val">1/4</span>
+    </div>
+    <div class="hud-card" id="card-col3">
+      <span class="hud-label" id="label-col3">Health</span>
+      <span id="hp-val" class="hud-val">100/100</span>
+    </div>
+    <div class="hud-card" id="card-col4">
+      <span class="hud-label" id="label-col4">Coins</span>
+      <span id="coins-val" class="hud-val">0</span>
+    </div>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="game-canvas" width="800" height="500"></canvas>
+    <div id="damage-flash" class="damage-flash"></div>
+
+    <!-- Mode Selection Menu Modal -->
+    <div id="mode-modal" class="modal-overlay active">
+      <h2 class="modal-title">CHOOSE GAME MODE</h2>
+      <p class="modal-subtitle">Select your battlefield in Arena Breaker.</p>
+
+      <div class="menu-grid">
+        <button id="mode-campaign-btn" class="menu-btn">
+          ⚔️ Classic Campaign
+          <span>Survive 3 waves + 1 Boss per level. Dodge enemy gunfire and upgrade!</span>
+        </button>
+        <button id="mode-ai-btn" class="menu-btn">
+          🤖 Play vs Computer
+          <span>1v1 shootout against a tactical AI bot with adjustable difficulty.</span>
+        </button>
+        <button id="mode-local2p-btn" class="menu-btn">
+          👥 Local 2 Player (Shared Device)
+          <span>P1 (Green): Joystick/Fire | P2 (Amber): WASD + [F] to shoot.</span>
+        </button>
+        <button id="mode-online-btn" class="menu-btn">
+          🌐 Online Multiplayer (WebSockets)
+          <span>Real-time 1v1 match over local or cloud WebSocket server.</span>
+        </button>
+      </div>
+
+      <div id="ai-difficulty-box" style="display:none; flex-direction:column; align-items:center;">
+        <span style="font-size:12px; color:#94a3b8; font-weight:600;">SELECT AI DIFFICULTY:</span>
+        <div class="difficulty-picker">
+          <button class="diff-btn" data-diff="easy">Easy</button>
+          <button class="diff-btn active" data-diff="normal">Normal</button>
+          <button class="diff-btn" data-diff="hard">Hard</button>
+        </div>
+        <button id="start-ai-match-btn" class="btn-primary">Start AI Duel ➔</button>
+      </div>
+
+      <div id="online-config-box" style="display:none; flex-direction:column; align-items:center; gap:8px;">
+        <span style="font-size:12px; color:#94a3b8;">SERVER WEBSOCKET URL:</span>
+        <input id="server-url-input" type="text" value="ws://localhost:8080" style="background:#1e293b; border:1px solid #475569; color:#f8fafc; border-radius:6px; padding:6px 12px; font-size:13px; text-align:center; width:260px;">
+        <div style="display:flex; gap:8px;">
+          <button id="connect-online-btn" class="btn-primary">Connect & Join ➔</button>
+          <button id="cancel-online-btn" class="btn-secondary">Back</button>
+        </div>
+        <span id="online-status-msg" style="font-size:11px; color:#facc15; margin-top:4px;">Requires node server.js running locally</span>
+      </div>
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pause-modal" class="modal-overlay">
+      <h2 class="modal-title">GAME PAUSED</h2>
+      <p class="modal-subtitle">Take a breather. All combat action is on hold.</p>
+      <div style="display:flex; gap:10px;">
+        <button id="resume-btn" class="btn-primary">Resume Game</button>
+        <button id="pause-restart-btn" class="btn-secondary">Restart</button>
+        <button id="pause-menu-btn" class="nav-btn">Modes</button>
+      </div>
+    </div>
+
+    <!-- Upgrade Shop Modal (Campaign Mode) -->
+    <div id="shop-modal" class="modal-overlay">
+      <h2 class="modal-title">ARENA CLEARED!</h2>
+      <p class="modal-subtitle">Upgrade your gladiator before entering the next arena level.</p>
+      
+      <div class="upgrade-grid">
+        <div class="upgrade-card">
+          <div class="upgrade-name">🔫 Bullet Damage</div>
+          <div class="upgrade-stat" id="stat-dmg">Damage: 1</div>
+          <button id="buy-dmg" class="btn-buy">Upgrade (10g)</button>
+        </div>
+        <div class="upgrade-card">
+          <div class="upgrade-name">❤️ Vitality</div>
+          <div class="upgrade-stat" id="stat-hp">Max HP: 100</div>
+          <button id="buy-hp" class="btn-buy">Upgrade (12g)</button>
+        </div>
+        <div class="upgrade-card">
+          <div class="upgrade-name">⚡ Move Speed</div>
+          <div class="upgrade-stat" id="stat-spd">Speed: 190</div>
+          <button id="buy-spd" class="btn-buy">Upgrade (8g)</button>
+        </div>
+        <div class="upgrade-card">
+          <div class="upgrade-name">⏱️ Fire Rate</div>
+          <div class="upgrade-stat" id="stat-haste">Interval: 220ms</div>
+          <button id="buy-haste" class="btn-buy">Upgrade (10g)</button>
+        </div>
+      </div>
+
+      <button id="next-arena-btn" class="btn-primary">Enter Next Arena ➔</button>
+    </div>
+
+    <!-- Match Over Modal (All Modes) -->
+    <div id="gameover-modal" class="modal-overlay">
+      <h2 id="modal-winner-title" class="modal-title" style="color:#ef4444;">GLADIATOR FALLEN</h2>
+      <p class="modal-subtitle" id="gameover-summary">Match finished.</p>
+      <div style="display:flex; gap:10px;">
+        <button id="modal-restart-btn" class="btn-primary">Play Again</button>
+        <button id="modal-menu-btn" class="btn-secondary">Change Mode</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Touch Controls: PUBG Virtual Joystick & Attack Button -->
+  <div class="controls-panel">
+    <div class="joystick-zone">
+      <div id="joystick-base" class="joystick-base">
+        <div id="joystick-knob" class="joystick-knob"></div>
+      </div>
+    </div>
+    <div class="action-zone">
+      <button id="attack-btn">FIRE<span>TAP / HOLD</span></button>
+    </div>
+  </div>
+
+  <div class="footer-row">
+    <button id="restart-btn" class="nav-btn">Restart</button>
+    <div id="instructions-text" class="instructions-bar">P1: Joystick/Arrows + Fire/Space | P2: WASD + [F] to Shoot</div>
+  </div>
+</div>
+
+<script>
+// =========================================================================
+// ADJUSTABLE GAMEPLAY CONFIGURATION (CHANGE TUNING & VISUALS HERE)
+// =========================================================================
+const CONFIG = {
+  // --- 1. SOLDIER SIZE & PROPORTIONS ---
+  soldierScale: 1.35,          // Adjust soldier scale (larger, clear on mobile)
+  bossScale: 1.95,             // Adjust boss scale multiplier
+
+  // --- 2. AIMING LASER SIGHT APPEARANCE ---
+  laserColor: "rgba(56, 189, 248, 0.45)", // Semi-transparent aiming line
+  laserDotColor: "#38bdf8",               // Target lock dot color
+  laserDotRadius: 3.5,                    // Size of target lock dot in pixels
+  laserDash: [4, 4],                      // Dotted line dash pattern [dash, gap]
+  laserRange: 380,                        // Maximum range to lock nearest enemy
+
+  // --- 3. ANIMATION SPEEDS & TIMERS ---
+  walkAnimSpeed: 14,           // Leg swing oscillation frequency while moving
+  muzzleFlashDuration: 0.06,   // Muzzle flash duration in seconds
+  recoilDuration: 0.08,        // Gun kickback recovery time in seconds
+  hitFlashDuration: 0.09,      // White hit-flash duration on soldiers taking damage
+
+  // --- 4. PLAYER WEAPON TUNING ---
+  playerBulletSpeed: 520,      // Pixels per second
+  playerBulletRange: 380,      // Fixed maximum travel distance in pixels
+  playerFireInterval: 220,     // Milliseconds between shots (hold fire)
+
+  // --- 5. ENEMY SHOOTING TUNING ---
+  enemyFireRateMin: 1800,      // Minimum ms between regular enemy shots
+  enemyFireRateMax: 2600,      // Maximum ms between regular enemy shots
+  enemyBulletSpeed: 250,       // Speed of regular enemy bullets (pixels/sec)
+  enemyBulletRange: 360,       // Maximum range of regular enemy bullets
+  enemyBulletDamage: 8,        // Damage dealt to player by regular enemy bullet
+  enemyTelegraphTime: 0.38,    // Seconds of aim warning laser before firing
+
+  // --- 6. BOSS SHOOTING TUNING ---
+  bossFireInterval: 2200,      // Milliseconds between boss 3-way spread volleys
+  bossBulletSpeed: 230,        // Speed of boss bullets (pixels/sec)
+  bossBulletRange: 420,        // Maximum range of boss bullets
+  bossBulletDamage: 12,        // Damage per boss bullet
+  bossTelegraphTime: 0.50,     // Seconds of warning before boss fires
+
+  // --- 7. ENEMY CONTACT DAMAGE ---
+  contactDamageRegular: 2,     // Minor bump damage from walking into regular enemy
+  contactDamageBoss: 4,        // Minor bump damage from walking into boss
+
+  // --- 8. JOYSTICK SIZE ---
+  joystickRadius: 38           // Joystick knob drag limit in pixels
+};
+// =========================================================================
+
+const canvas = document.getElementById("game-canvas");
+const ctx = canvas.getContext("2d");
+const damageFlashEl = document.getElementById("damage-flash");
+
+const modeBadge = document.getElementById("current-mode-badge");
+const pauseBtn = document.getElementById("pause-btn");
+const menuBtn = document.getElementById("menu-btn");
+const soundBtn = document.getElementById("sound-btn");
+const restartBtn = document.getElementById("restart-btn");
+
+const modeModal = document.getElementById("mode-modal");
+const pauseModal = document.getElementById("pause-modal");
+const shopModal = document.getElementById("shop-modal");
+const gameoverModal = document.getElementById("gameover-modal");
+const modalWinnerTitle = document.getElementById("modal-winner-title");
+const gameoverSummary = document.getElementById("gameover-summary");
+const resumeBtn = document.getElementById("resume-btn");
+const pauseRestartBtn = document.getElementById("pause-restart-btn");
+const pauseMenuBtn = document.getElementById("pause-menu-btn");
+const modalRestartBtn = document.getElementById("modal-restart-btn");
+const modalMenuBtn = document.getElementById("modal-menu-btn");
+
+const modeCampaignBtn = document.getElementById("mode-campaign-btn");
+const modeAiBtn = document.getElementById("mode-ai-btn");
+const modeLocal2pBtn = document.getElementById("mode-local2p-btn");
+const modeOnlineBtn = document.getElementById("mode-online-btn");
+const aiDiffBox = document.getElementById("ai-difficulty-box");
+const startAiMatchBtn = document.getElementById("start-ai-match-btn");
+const onlineConfigBox = document.getElementById("online-config-box");
+const serverUrlInput = document.getElementById("server-url-input");
+const connectOnlineBtn = document.getElementById("connect-online-btn");
+const cancelOnlineBtn = document.getElementById("cancel-online-btn");
+const onlineStatusMsg = document.getElementById("online-status-msg");
+const instructionsText = document.getElementById("instructions-text");
+
+const hudBar = document.getElementById("hud-bar");
+const cardCol1 = document.getElementById("card-col1");
+const cardCol2 = document.getElementById("card-col2");
+const cardCol3 = document.getElementById("card-col3");
+const cardCol4 = document.getElementById("card-col4");
+const labelCol1 = document.getElementById("label-col1");
+const labelCol2 = document.getElementById("label-col2");
+const labelCol3 = document.getElementById("label-col3");
+const labelCol4 = document.getElementById("label-col4");
+const valCol1 = document.getElementById("level-val");
+const valCol2 = document.getElementById("wave-val");
+const valCol3 = document.getElementById("hp-val");
+const valCol4 = document.getElementById("coins-val");
+
+const statDmg = document.getElementById("stat-dmg");
+const statHp = document.getElementById("stat-hp");
+const statSpd = document.getElementById("stat-spd");
+const statHaste = document.getElementById("stat-haste");
+const buyDmgBtn = document.getElementById("buy-dmg");
+const buyHpBtn = document.getElementById("buy-hp");
+const buySpdBtn = document.getElementById("buy-spd");
+const buyHasteBtn = document.getElementById("buy-haste");
+const nextArenaBtn = document.getElementById("next-arena-btn");
+
+const joystickBase = document.getElementById("joystick-base");
+const joystickKnob = document.getElementById("joystick-knob");
+const attackBtn = document.getElementById("attack-btn");
+
+let audioCtx = null;
+let soundEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) audioCtx = new AudioContextClass();
+  }
+  if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+
+function playTone(freq, type, duration, gainStart = 0.08) {
+  if (!soundEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(gainStart, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+
+function sfxPlayerShoot() { playTone(440, "square", 0.07, 0.05); }
+function sfxEnemyShoot() { playTone(220, "sawtooth", 0.09, 0.06); }
+function sfxBulletHit() {
+  if (!soundEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(75, audioCtx.currentTime + 0.09);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.09);
+  } catch (e) {}
+}
+function sfxCoin() { playTone(720, "sine", 0.14, 0.08); }
+function sfxUpgrade() {
+  playTone(520, "sine", 0.08, 0.08);
+  setTimeout(() => playTone(820, "sine", 0.14, 0.08), 80);
+}
+function sfxGameOver(win = false) {
+  if (win) {
+    playTone(440, "sine", 0.12, 0.12);
+    setTimeout(() => playTone(660, "sine", 0.25, 0.12), 120);
+  } else {
+    playTone(150, "sawtooth", 0.2, 0.15);
+    setTimeout(() => playTone(90, "sawtooth", 0.4, 0.2), 160);
+  }
+}
+
+let currentMode = 'campaign';
+let aiDifficulty = 'normal';
+
+const keys = {};
+let player1, player2, botFighter, enemies, bullets, particles;
+let level = 1, wave = 1, coins = 0;
+let gameOver = false, inShop = false, isPaused = false;
+let levelBanner = "ARENA 1 - READY", bannerTimer = 90;
+let lastFrameTime = performance.now();
+
+let isP1Firing = false;
+let lastP1ShotTime = 0;
+
+let isP2Firing = false;
+let lastP2ShotTime = 0;
+
+let lastBotShotTime = 0;
+
+let joystickVector = { x: 0, y: 0 };
+let joystickPointerId = null;
+
+let socket = null;
+let onlineRole = null;
+let onlineConnected = false;
+
+let p1Stats = {
+  damage: 1,
+  maxHp: 100,
+  speed: 190,
+  fireInterval: CONFIG.playerFireInterval,
+  costDmg: 10, costHp: 12, costSpd: 8, costHaste: 10
+};
+
+let p2Stats = {
+  damage: 1,
+  maxHp: 100,
+  speed: 190,
+  fireInterval: CONFIG.playerFireInterval
+};
+
+function setGameMode(mode) {
+  currentMode = mode;
+  modeModal.classList.remove("active");
+  pauseModal.classList.remove("active");
+  shopModal.classList.remove("active");
+  gameoverModal.classList.remove("active");
+  isPaused = false;
+
+  if (mode === 'campaign') {
+    modeBadge.textContent = "Campaign";
+    instructionsText.textContent = "Move: Joystick / WASD | Fire: Red Button or Spacebar";
+  } else if (mode === 'ai') {
+    modeBadge.textContent = "Vs Computer (" + aiDifficulty + ")";
+    instructionsText.textContent = "P1: Joystick or WASD/Arrows | Fire: Red Button or Spacebar";
+  } else if (mode === 'local2p') {
+    modeBadge.textContent = "Local 2P";
+    instructionsText.textContent = "P1 (Green): Joystick + FIRE | P2 (Amber): WASD + [F] to shoot";
+  } else if (mode === 'online') {
+    modeBadge.textContent = "Online 1v1";
+    instructionsText.textContent = "Connected online. Move: Joystick/Arrows | Shoot: Fire/Space";
+  }
+
+  resetGame();
+}
+
+function resetGame() {
+  gameOver = false;
+  inShop = false;
+  isPaused = false;
+  isP1Firing = false;
+  isP2Firing = false;
+  levelBanner = (currentMode === 'campaign') ? "ARENA " + level + " - READY" : "FIGHT!";
+  bannerTimer = 90;
+
+  player1 = {
+    x: (currentMode === 'campaign') ? 400 : 220,
+    y: 250,
+    r: 18,
+    hp: p1Stats.maxHp,
+    maxHp: p1Stats.maxHp,
+    facingX: 1,
+    facingY: 0,
+    isMoving: false,
+    walkTime: 0,
+    recoilTimer: 0,
+    muzzleTimer: 0,
+    hitFlashTimer: 0,
+    theme: 'player_green'
+  };
+
+  player2 = {
+    x: 580,
+    y: 250,
+    r: 18,
+    hp: 100,
+    maxHp: 100,
+    facingX: -1,
+    facingY: 0,
+    isMoving: false,
+    walkTime: 0,
+    recoilTimer: 0,
+    muzzleTimer: 0,
+    hitFlashTimer: 0,
+    theme: 'player_amber'
+  };
+
+  botFighter = {
+    x: 580,
+    y: 250,
+    r: 20,
+    hp: 100,
+    maxHp: 100,
+    facingX: -1,
+    facingY: 0,
+    isMoving: false,
+    walkTime: 0,
+    recoilTimer: 0,
+    muzzleTimer: 0,
+    hitFlashTimer: 0,
+    theme: 'bot_purple',
+    strafeDir: 1,
+    strafeTimer: 0
+  };
+
+  enemies = [];
+  bullets = [];
+  particles = [];
+
+  resetJoystick();
+  pauseModal.classList.remove("active");
+  shopModal.classList.remove("active");
+  gameoverModal.classList.remove("active");
+
+  updateHudLayout();
+  updateHud();
+
+  if (currentMode === 'campaign') {
+    spawnWave();
+  }
+}
+
+function updateHudLayout() {
+  if (currentMode === 'campaign') {
+    hudBar.classList.remove("hud-duel");
+    cardCol1.style.display = "block";
+    cardCol2.style.display = "block";
+    cardCol4.style.display = "block";
+    labelCol1.textContent = "Arena Level";
+    labelCol2.textContent = "Wave";
+    labelCol3.textContent = "Health";
+    labelCol4.textContent = "Coins";
+  } else if (currentMode === 'ai') {
+    hudBar.classList.add("hud-duel");
+    cardCol1.style.display = "none";
+    cardCol4.style.display = "none";
+    cardCol2.style.display = "block";
+    labelCol2.textContent = "AI Opponent HP";
+    labelCol3.textContent = "Gladiator (Green) HP";
+  } else if (currentMode === 'local2p') {
+    hudBar.classList.add("hud-duel");
+    cardCol1.style.display = "none";
+    cardCol4.style.display = "none";
+    cardCol2.style.display = "block";
+    labelCol2.textContent = "Player 2 (Amber) HP";
+    labelCol3.textContent = "Player 1 (Green) HP";
+  } else if (currentMode === 'online') {
+    hudBar.classList.add("hud-duel");
+    cardCol1.style.display = "none";
+    cardCol4.style.display = "none";
+    cardCol2.style.display = "block";
+    labelCol2.textContent = "Opponent HP";
+    labelCol3.textContent = "Your HP";
+  }
+}
+
+function updateHud() {
+  if (currentMode === 'campaign') {
+    valCol1.textContent = level;
+    valCol2.textContent = (wave === 4 ? "BOSS" : wave + "/4");
+    valCol3.textContent = player1.hp + "/" + p1Stats.maxHp;
+    valCol4.textContent = coins;
+  } else if (currentMode === 'ai') {
+    valCol3.textContent = player1.hp + "/" + player1.maxHp;
+    valCol2.textContent = botFighter.hp + "/" + botFighter.maxHp;
+  } else if (currentMode === 'local2p') {
+    valCol3.textContent = player1.hp + "/" + player1.maxHp;
+    valCol2.textContent = player2.hp + "/" + player2.maxHp;
+  } else if (currentMode === 'online') {
+    valCol3.textContent = player1.hp + "/" + player1.maxHp;
+    valCol2.textContent = player2.hp + "/" + player2.maxHp;
+  }
+}
+
+function spawnWave() {
+  enemies = [];
+  const isBossWave = (wave === 4);
+  const count = isBossWave ? 1 : wave + 2;
+
+  if (isBossWave) {
+    levelBanner = "WARNING: COMMANDER BOSS!";
+    bannerTimer = 110;
+    playTone(75, "sawtooth", 0.5, 0.18);
+  }
+
+  for (let i = 0; i < count; i++) {
+    let x, y;
+    do {
+      x = 70 + Math.random() * (canvas.width - 140);
+      y = 70 + Math.random() * (canvas.height - 140);
+    } while (Math.hypot(x - player1.x, y - player1.y) < 170);
+
+    const baseHp = isBossWave ? (9 + level * 3) : (2 + Math.floor(level / 2));
+    const baseSpeed = isBossWave ? (38 + level * 3) : (44 + level * 4);
+    const initialShotDelay = isBossWave ? 1.4 : (1.0 + Math.random() * 1.6);
+
+    enemies.push({
+      x, y,
+      r: isBossWave ? 26 : 18,
+      hp: baseHp,
+      maxHp: baseHp,
+      speed: baseSpeed,
+      boss: isBossWave,
+      hitCooldown: 0,
+      facingX: 1,
+      facingY: 0,
+      isMoving: false,
+      walkTime: Math.random() * 10,
+      recoilTimer: 0,
+      muzzleTimer: 0,
+      hitFlashTimer: 0,
+      shotCooldown: initialShotDelay,
+      telegraphTimer: 0,
+      theme: isBossWave ? 'boss_dark' : 'enemy_dark'
+    });
+  }
+  updateHud();
+}
+
+function advanceWaveOrLevel() {
+  if (wave < 4) {
+    wave++;
+    spawnWave();
+  } else {
+    inShop = true;
+    isP1Firing = false;
+    player1.hp = Math.min(p1Stats.maxHp, player1.hp + Math.round(p1Stats.maxHp * 0.35));
+    updateShopUI();
+    shopModal.classList.add("active");
+  }
+}
+
+function updateShopUI() {
+  statDmg.textContent = "Damage: " + p1Stats.damage;
+  statHp.textContent = "Max HP: " + p1Stats.maxHp;
+  statSpd.textContent = "Speed: " + Math.round(p1Stats.speed);
+  statHaste.textContent = "Interval: " + p1Stats.fireInterval + "ms";
+
+  buyDmgBtn.textContent = "Upgrade (" + p1Stats.costDmg + "g)";
+  buyHpBtn.textContent = "Upgrade (" + p1Stats.costHp + "g)";
+  buySpdBtn.textContent = "Upgrade (" + p1Stats.costSpd + "g)";
+  buyHasteBtn.textContent = "Upgrade (" + p1Stats.costHaste + "g)";
+
+  buyDmgBtn.disabled = (coins < p1Stats.costDmg);
+  buyHpBtn.disabled = (coins < p1Stats.costHp);
+  buySpdBtn.disabled = (coins < p1Stats.costSpd);
+  buyHasteBtn.disabled = (coins < p1Stats.costHaste);
+
+  valCol4.textContent = coins;
+}
+
+buyDmgBtn.addEventListener("click", () => {
+  if (coins >= p1Stats.costDmg) {
+    coins -= p1Stats.costDmg;
+    p1Stats.damage += 1;
+    p1Stats.costDmg = Math.round(p1Stats.costDmg * 1.5);
+    sfxUpgrade(); updateShopUI(); updateHud();
+  }
+});
+buyHpBtn.addEventListener("click", () => {
+  if (coins >= p1Stats.costHp) {
+    coins -= p1Stats.costHp;
+    p1Stats.maxHp += 25;
+    player1.hp = p1Stats.maxHp;
+    p1Stats.costHp = Math.round(p1Stats.costHp * 1.5);
+    sfxUpgrade(); updateShopUI(); updateHud();
+  }
+});
+buySpdBtn.addEventListener("click", () => {
+  if (coins >= p1Stats.costSpd) {
+    coins -= p1Stats.costSpd;
+    p1Stats.speed += 20;
+    p1Stats.costSpd = Math.round(p1Stats.costSpd * 1.5);
+    sfxUpgrade(); updateShopUI(); updateHud();
+  }
+});
+buyHasteBtn.addEventListener("click", () => {
+  if (coins >= p1Stats.costHaste && p1Stats.fireInterval > 110) {
+    coins -= p1Stats.costHaste;
+    p1Stats.fireInterval = Math.max(100, p1Stats.fireInterval - 25);
+    p1Stats.costHaste = Math.round(p1Stats.costHaste * 1.6);
+    sfxUpgrade(); updateShopUI(); updateHud();
+  }
+});
+nextArenaBtn.addEventListener("click", () => {
+  shopModal.classList.remove("active");
+  inShop = false;
+  level++;
+  wave = 1;
+  levelBanner = "ENTERED ARENA " + level;
+  bannerTimer = 100;
+  spawnWave();
+  updateHud();
+});
+
+function fireBullet(shooter, ownerTag, damage, customSpeed, customRange, customAngleOffset = 0) {
+  if (gameOver || inShop || isPaused) return;
+
+  let baseAngle = Math.atan2(shooter.facingY, shooter.facingX);
+  baseAngle += customAngleOffset;
+
+  const dirX = Math.cos(baseAngle);
+  const dirY = Math.sin(baseAngle);
+
+  const speed = customSpeed || CONFIG.playerBulletSpeed;
+  const range = customRange || CONFIG.playerBulletRange;
+
+  const spawnX = shooter.x + dirX * (shooter.r + 6);
+  const spawnY = shooter.y + dirY * (shooter.r + 6);
+
+  shooter.muzzleTimer = CONFIG.muzzleFlashDuration;
+  shooter.recoilTimer = CONFIG.recoilDuration;
+
+  let bulletColor = "#facc15";
+  let bulletRadius = 4.5;
+
+  if (ownerTag === 'enemy') {
+    bulletColor = "#ef4444";
+    bulletRadius = 4.0;
+  } else if (ownerTag === 'boss') {
+    bulletColor = "#fb923c";
+    bulletRadius = 6.0;
+  } else if (ownerTag === 'p2') {
+    bulletColor = "#f59e0b";
+  } else if (ownerTag === 'bot') {
+    bulletColor = "#c084fc";
+  }
+
+  bullets.push({
+    x: spawnX,
+    y: spawnY,
+    vx: dirX * speed,
+    vy: dirY * speed,
+    speed: speed,
+    distanceTraveled: 0,
+    maxRange: range,
+    radius: bulletRadius,
+    damage: damage,
+    owner: ownerTag,
+    color: bulletColor
+  });
+
+  for (let i = 0; i < 3; i++) {
+    particles.push({
+      x: spawnX, y: spawnY,
+      vx: dirX * 70 + (Math.random() - 0.5) * 35,
+      vy: dirY * 70 + (Math.random() - 0.5) * 35,
+      life: 0.1, maxLife: 0.1,
+      color: bulletColor, r: 2.5
+    });
+  }
+
+  if (ownerTag === 'enemy' || ownerTag === 'boss') {
+    sfxEnemyShoot();
+  } else {
+    sfxPlayerShoot();
+  }
+
+  if (currentMode === 'online' && socket && socket.readyState === WebSocket.OPEN && ownerTag === 'p1') {
+    socket.send(JSON.stringify({
+      type: 'shoot',
+      x: spawnX, y: spawnY,
+      dirX: dirX, dirY: dirY
+    }));
+  }
+}
+
+function handleJoystickPointer(clientX, clientY) {
+  const rect = joystickBase.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+
+  let deltaX = clientX - centerX;
+  let deltaY = clientY - centerY;
+  const distance = Math.hypot(deltaX, deltaY);
+  const maxRadius = CONFIG.joystickRadius;
+
+  if (distance > 0.001) {
+    const clampedDist = Math.min(distance, maxRadius);
+    const normX = deltaX / distance;
+    const normY = deltaY / distance;
+
+    const knobX = normX * clampedDist;
+    const knobY = normY * clampedDist;
+    joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+
+    const factor = clampedDist / maxRadius;
+    joystickVector.x = normX * factor;
+    joystickVector.y = normY * factor;
+
+    player1.facingX = normX;
+    player1.facingY = normY;
+  }
+}
+
+function resetJoystick() {
+  joystickVector.x = 0;
+  joystickVector.y = 0;
+  joystickKnob.style.transform = "translate(0px, 0px)";
+  joystickKnob.classList.remove("dragging");
+  joystickPointerId = null;
+}
+
+joystickBase.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  initAudio();
+  joystickPointerId = e.pointerId;
+  joystickBase.setPointerCapture(e.pointerId);
+  joystickKnob.classList.add("dragging");
+  handleJoystickPointer(e.clientX, e.clientY);
+});
+
+joystickBase.addEventListener("pointermove", (e) => {
+  if (joystickPointerId === e.pointerId) {
+    e.preventDefault();
+    handleJoystickPointer(e.clientX, e.clientY);
+  }
+});
+
+const endJoystick = (e) => {
+  if (joystickPointerId === e.pointerId) {
+    e.preventDefault();
+    resetJoystick();
+  }
+};
+joystickBase.addEventListener("pointerup", endJoystick);
+joystickBase.addEventListener("pointercancel", endJoystick);
+joystickBase.addEventListener("lostpointercapture", endJoystick);
+
+function startP1Firing(e) {
+  if (e) {
+    e.preventDefault();
+    attackBtn.setPointerCapture(e.pointerId);
+  }
+  initAudio();
+  attackBtn.classList.add("active");
+  isP1Firing = true;
+
+  const now = performance.now();
+  if (now - lastP1ShotTime >= p1Stats.fireInterval) {
+    fireBullet(player1, 'p1', p1Stats.damage, CONFIG.playerBulletSpeed, CONFIG.playerBulletRange);
+    lastP1ShotTime = now;
+  }
+}
+function stopP1Firing(e) {
+  if (e) e.preventDefault();
+  attackBtn.classList.remove("active");
+  isP1Firing = false;
+}
+attackBtn.addEventListener("pointerdown", startP1Firing);
+attackBtn.addEventListener("pointerup", stopP1Firing);
+attackBtn.addEventListener("pointercancel", stopP1Firing);
+attackBtn.addEventListener("lostpointercapture", stopP1Firing);
+
+document.addEventListener("keydown", (e) => {
+  keys[e.key] = true;
+  keys[e.code] = true;
+
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (!isP1Firing) startP1Firing();
+  }
+
+  if (e.code === "KeyP" || e.key === "p" || e.key === "P") {
+    togglePause();
+  }
+
+  if (currentMode === 'local2p' && (e.key === 'f' || e.key === 'F')) {
+    e.preventDefault();
+    isP2Firing = true;
+    const now = performance.now();
+    if (now - lastP2ShotTime >= p2Stats.fireInterval) {
+      fireBullet(player2, 'p2', p2Stats.damage, CONFIG.playerBulletSpeed, CONFIG.playerBulletRange);
+      lastP2ShotTime = now;
+    }
+  }
+});
+
+document.addEventListener("keyup", (e) => {
+  keys[e.key] = false;
+  keys[e.code] = false;
+
+  if (e.code === "Space") stopP1Firing();
+  if (e.key === 'f' || e.key === 'F') isP2Firing = false;
+});
+
+function togglePause() {
+  if (gameOver || inShop || modeModal.classList.contains("active")) return;
+  isPaused = !isPaused;
+  if (isPaused) {
+    pauseModal.classList.add("active");
+    pauseBtn.textContent = "Resume";
+  } else {
+    pauseModal.classList.remove("active");
+    pauseBtn.textContent = "Pause";
+    lastFrameTime = performance.now();
+  }
+}
+pauseBtn.addEventListener("click", togglePause);
+resumeBtn.addEventListener("click", () => {
+  if (isPaused) togglePause();
+});
+pauseRestartBtn.addEventListener("click", () => {
+  pauseModal.classList.remove("active");
+  pauseBtn.textContent = "Pause";
+  resetGame();
+});
+pauseMenuBtn.addEventListener("click", () => {
+  pauseModal.classList.remove("active");
+  pauseBtn.textContent = "Pause";
+  modeModal.classList.add("active");
+});
+
+soundBtn.addEventListener("click", () => {
+  initAudio();
+  soundEnabled = !soundEnabled;
+  soundBtn.textContent = soundEnabled ? "Sound: ON" : "Sound: OFF";
+});
+menuBtn.addEventListener("click", () => {
+  if (isPaused) togglePause();
+  modeModal.classList.add("active");
+});
+restartBtn.addEventListener("click", resetGame);
+modalRestartBtn.addEventListener("click", resetGame);
+modalMenuBtn.addEventListener("click", () => {
+  gameoverModal.classList.remove("active");
+  modeModal.classList.add("active");
+});
+
+modeCampaignBtn.addEventListener("click", () => setGameMode('campaign'));
+modeAiBtn.addEventListener("click", () => {
+  aiDiffBox.style.display = "flex";
+  onlineConfigBox.style.display = "none";
+});
+document.querySelectorAll(".diff-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".diff-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    aiDifficulty = btn.dataset.diff;
+  });
+});
+startAiMatchBtn.addEventListener("click", () => {
+  setGameMode('ai');
+});
+modeLocal2pBtn.addEventListener("click", () => setGameMode('local2p'));
+modeOnlineBtn.addEventListener("click", () => {
+  aiDiffBox.style.display = "none";
+  onlineConfigBox.style.display = "flex";
+});
+cancelOnlineBtn.addEventListener("click", () => {
+  onlineConfigBox.style.display = "none";
+});
+
+document.addEventListener("touchmove", (e) => {
+  if (e.target.closest(".game-container")) e.preventDefault();
+}, { passive: false });
+
+connectOnlineBtn.addEventListener("click", () => {
+  const url = serverUrlInput.value.trim() || "ws://localhost:8080";
+  onlineStatusMsg.textContent = "Connecting to " + url + "...";
+
+  try {
+    socket = new WebSocket(url);
+  } catch (err) {
+    onlineStatusMsg.textContent = "Failed to open WebSocket: " + err.message;
+    return;
+  }
+
+  socket.onopen = () => {
+    onlineStatusMsg.textContent = "Connected! Waiting for match...";
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'matched') {
+        onlineRole = msg.role;
+        onlineStatusMsg.textContent = msg.message;
+      } else if (msg.type === 'start') {
+        onlineRole = msg.role;
+        onlineConnected = true;
+        setGameMode('online');
+      } else if (msg.type === 'sync') {
+        player2.x = msg.x;
+        player2.y = msg.y;
+        player2.facingX = msg.facingX;
+        player2.facingY = msg.facingY;
+        player2.isMoving = msg.isMoving;
+        player2.hp = msg.hp;
+        updateHud();
+      } else if (msg.type === 'shoot') {
+        bullets.push({
+          x: msg.x, y: msg.y,
+          vx: msg.dirX * CONFIG.playerBulletSpeed,
+          vy: msg.dirY * CONFIG.playerBulletSpeed,
+          speed: CONFIG.playerBulletSpeed,
+          distanceTraveled: 0,
+          maxRange: CONFIG.playerBulletRange,
+          radius: 4.5,
+          damage: 1,
+          owner: 'p2',
+          color: "#f59e0b"
+        });
+        player2.muzzleTimer = CONFIG.muzzleFlashDuration;
+        player2.recoilTimer = CONFIG.recoilDuration;
+        sfxPlayerShoot();
+      } else if (msg.type === 'opponent_left') {
+        levelBanner = "OPPONENT DISCONNECTED";
+        bannerTimer = 180;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  socket.onerror = () => {
+    onlineStatusMsg.textContent = "Could not reach server. Run 'node server.js' to host.";
+  };
+  socket.onclose = () => {
+    onlineConnected = false;
+  };
+});
+
+function updateBotAI(dt, now) {
+  const dx = player1.x - botFighter.x;
+  const dy = player1.y - botFighter.y;
+  const dist = Math.hypot(dx, dy) || 1;
+
+  botFighter.facingX = dx / dist;
+  botFighter.facingY = dy / dist;
+
+  let botSpeed = 160;
+  let botFireInterval = 320;
+  let idealDist = 220;
+
+  if (aiDifficulty === 'easy') {
+    botSpeed = 110;
+    botFireInterval = 460;
+    idealDist = 250;
+  } else if (aiDifficulty === 'hard') {
+    botSpeed = 200;
+    botFireInterval = 210;
+    idealDist = 190;
+  }
+
+  botFighter.strafeTimer -= dt;
+  if (botFighter.strafeTimer <= 0) {
+    botFighter.strafeDir = (Math.random() > 0.5 ? 1 : -1);
+    botFighter.strafeTimer = 1.0 + Math.random() * 1.5;
+  }
+
+  let moveX = 0, moveY = 0;
+  if (dist > idealDist + 40) {
+    moveX += botFighter.facingX;
+    moveY += botFighter.facingY;
+  } else if (dist < idealDist - 30) {
+    moveX -= botFighter.facingX;
+    moveY -= botFighter.facingY;
+  }
+
+  const perpX = -botFighter.facingY * botFighter.strafeDir;
+  const perpY = botFighter.facingX * botFighter.strafeDir;
+  moveX += perpX * 0.75;
+  moveY += perpY * 0.75;
+
+  const mLen = Math.hypot(moveX, moveY);
+  if (mLen > 0.001) {
+    botFighter.isMoving = true;
+    botFighter.walkTime += dt * CONFIG.walkAnimSpeed;
+    botFighter.x += (moveX / mLen) * botSpeed * dt;
+    botFighter.y += (moveY / mLen) * botSpeed * dt;
+  } else {
+    botFighter.isMoving = false;
+  }
+
+  botFighter.x = Math.max(botFighter.r + 6, Math.min(canvas.width - botFighter.r - 6, botFighter.x));
+  botFighter.y = Math.max(botFighter.r + 6, Math.min(canvas.height - botFighter.r - 6, botFighter.y));
+
+  if (dist < CONFIG.playerBulletRange && (now - lastBotShotTime >= botFireInterval)) {
+    fireBullet(botFighter, 'bot', 1, CONFIG.playerBulletSpeed, CONFIG.playerBulletRange);
+    lastBotShotTime = now;
+  }
+}
+
+function update(dt) {
+  if (gameOver || inShop || isPaused) return;
+
+  const now = performance.now();
+
+  player1.muzzleTimer = Math.max(0, player1.muzzleTimer - dt);
+  player1.recoilTimer = Math.max(0, player1.recoilTimer - dt);
+  player1.hitFlashTimer = Math.max(0, player1.hitFlashTimer - dt);
+
+  player2.muzzleTimer = Math.max(0, player2.muzzleTimer - dt);
+  player2.recoilTimer = Math.max(0, player2.recoilTimer - dt);
+  player2.hitFlashTimer = Math.max(0, player2.hitFlashTimer - dt);
+
+  botFighter.muzzleTimer = Math.max(0, botFighter.muzzleTimer - dt);
+  botFighter.recoilTimer = Math.max(0, botFighter.recoilTimer - dt);
+  botFighter.hitFlashTimer = Math.max(0, botFighter.hitFlashTimer - dt);
+
+  for (const enemy of enemies) {
+    enemy.muzzleTimer = Math.max(0, enemy.muzzleTimer - dt);
+    enemy.recoilTimer = Math.max(0, enemy.recoilTimer - dt);
+    enemy.hitFlashTimer = Math.max(0, enemy.hitFlashTimer - dt);
+  }
+
+  if (isP1Firing && (now - lastP1ShotTime >= p1Stats.fireInterval)) {
+    fireBullet(player1, 'p1', p1Stats.damage, CONFIG.playerBulletSpeed, CONFIG.playerBulletRange);
+    lastP1ShotTime = now;
+  }
+
+  if (currentMode === 'local2p' && isP2Firing && (now - lastP2ShotTime >= p2Stats.fireInterval)) {
+    fireBullet(player2, 'p2', p2Stats.damage, CONFIG.playerBulletSpeed, CONFIG.playerBulletRange);
+    lastP2ShotTime = now;
+  }
+
+  let moveX = joystickVector.x;
+  let moveY = joystickVector.y;
+
+  let keyX = 0, keyY = 0;
+  if (currentMode === 'local2p') {
+    if (keys.ArrowLeft) keyX--;
+    if (keys.ArrowRight) keyX++;
+    if (keys.ArrowUp) keyY--;
+    if (keys.ArrowDown) keyY++;
+  } else {
+    if (keys.ArrowLeft || keys.a || keys.A) keyX--;
+    if (keys.ArrowRight || keys.d || keys.D) keyX++;
+    if (keys.ArrowUp || keys.w || keys.W) keyY--;
+    if (keys.ArrowDown || keys.s || keys.S) keyY++;
+  }
+
+  if (keyX !== 0 || keyY !== 0) {
+    const kLen = Math.hypot(keyX, keyY);
+    moveX = keyX / kLen;
+    moveY = keyY / kLen;
+    player1.facingX = moveX;
+    player1.facingY = moveY;
+  }
+
+  const p1MoveDist = Math.hypot(moveX, moveY);
+  if (p1MoveDist > 0.05) {
+    player1.isMoving = true;
+    player1.walkTime += dt * CONFIG.walkAnimSpeed;
+  } else {
+    player1.isMoving = false;
+  }
+
+  player1.x += moveX * p1Stats.speed * dt;
+  player1.y += moveY * p1Stats.speed * dt;
+  player1.x = Math.max(player1.r + 6, Math.min(canvas.width - player1.r - 6, player1.x));
+  player1.y = Math.max(player1.r + 6, Math.min(canvas.height - player1.r - 6, player1.y));
+
+  if (currentMode === 'online' && socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'sync',
+      x: player1.x, y: player1.y,
+      facingX: player1.facingX, facingY: player1.facingY,
+      isMoving: player1.isMoving,
+      hp: player1.hp
+    }));
+  }
+
+  if (currentMode === 'local2p') {
+    let p2X = 0, p2Y = 0;
+    if (keys.a || keys.A) p2X--;
+    if (keys.d || keys.D) p2X++;
+    if (keys.w || keys.W) p2Y--;
+    if (keys.s || keys.S) p2Y++;
+
+    if (p2X !== 0 || p2Y !== 0) {
+      const p2Len = Math.hypot(p2X, p2Y);
+      player2.isMoving = true;
+      player2.walkTime += dt * CONFIG.walkAnimSpeed;
+      player2.x += (p2X / p2Len) * p2Stats.speed * dt;
+      player2.y += (p2Y / p2Len) * p2Stats.speed * dt;
+      player2.facingX = p2X / p2Len;
+      player2.facingY = p2Y / p2Len;
+    } else {
+      player2.isMoving = false;
+    }
+    player2.x = Math.max(player2.r + 6, Math.min(canvas.width - player2.r - 6, player2.x));
+    player2.y = Math.max(player2.r + 6, Math.min(canvas.height - player2.r - 6, player2.y));
+  }
+
+  if (currentMode === 'ai') {
+    updateBotAI(dt, now);
+  }
+
+  if (currentMode === 'campaign') {
+    for (const enemy of enemies) {
+      const vx = player1.x - enemy.x;
+      const vy = player1.y - enemy.y;
+      const dist = Math.hypot(vx, vy) || 1;
+
+      enemy.facingX = vx / dist;
+      enemy.facingY = vy / dist;
+
+      const preferredCombatDistance = enemy.boss ? 240 : 180;
+      let eMoveX = 0, eMoveY = 0;
+
+      if (dist > preferredCombatDistance + 20) {
+        eMoveX = (vx / dist);
+        eMoveY = (vy / dist);
+        enemy.x += eMoveX * enemy.speed * dt;
+        enemy.y += eMoveY * enemy.speed * dt;
+        enemy.isMoving = true;
+        enemy.walkTime += dt * CONFIG.walkAnimSpeed;
+      } else if (dist < preferredCombatDistance - 40) {
+        eMoveX = -(vx / dist);
+        eMoveY = -(vy / dist);
+        enemy.x += eMoveX * (enemy.speed * 0.7) * dt;
+        enemy.y += eMoveY * (enemy.speed * 0.7) * dt;
+        enemy.isMoving = true;
+        enemy.walkTime += dt * CONFIG.walkAnimSpeed;
+      } else {
+        enemy.isMoving = false;
+      }
+
+      enemy.x = Math.max(enemy.r + 6, Math.min(canvas.width - enemy.r - 6, enemy.x));
+      enemy.y = Math.max(enemy.r + 6, Math.min(canvas.height - enemy.r - 6, enemy.y));
+
+      if (dist < player1.r + enemy.r && enemy.hitCooldown <= 0) {
+        const bumpDamage = enemy.boss ? CONFIG.contactDamageBoss : CONFIG.contactDamageRegular;
+        player1.hp = Math.max(0, player1.hp - bumpDamage);
+        player1.hitFlashTimer = CONFIG.hitFlashDuration;
+        triggerDamageVignette();
+        enemy.hitCooldown = 1.0;
+        sfxBulletHit();
+        spawnHitSpark(player1.x, player1.y, "#22c55e");
+
+        if (player1.hp <= 0) {
+          triggerGameOver(false, "You were overcome by enemy forces in Arena Level " + level + ".");
+        }
+        updateHud();
+      }
+      if (enemy.hitCooldown > 0) enemy.hitCooldown -= dt;
+
+      const fireInterval = enemy.boss ? CONFIG.bossFireInterval : (CONFIG.enemyFireRateMin + Math.random() * (CONFIG.enemyFireRateMax - CONFIG.enemyFireRateMin));
+      const telegraphDuration = enemy.boss ? CONFIG.bossTelegraphTime : CONFIG.enemyTelegraphTime;
+
+      enemy.shotCooldown -= dt;
+
+      if (enemy.shotCooldown <= telegraphDuration && enemy.shotCooldown > 0) {
+        enemy.telegraphTimer = enemy.shotCooldown;
+      } else {
+        enemy.telegraphTimer = 0;
+      }
+
+      if (enemy.shotCooldown <= 0) {
+        enemy.shotCooldown = fireInterval / 1000;
+        enemy.telegraphTimer = 0;
+
+        if (dist <= (enemy.boss ? CONFIG.bossBulletRange : CONFIG.enemyBulletRange) + 50) {
+          if (enemy.boss) {
+            fireBullet(enemy, 'boss', CONFIG.bossBulletDamage, CONFIG.bossBulletSpeed, CONFIG.bossBulletRange, 0);
+            fireBullet(enemy, 'boss', CONFIG.bossBulletDamage, CONFIG.bossBulletSpeed, CONFIG.bossBulletRange, 0.32);
+            fireBullet(enemy, 'boss', CONFIG.bossBulletDamage, CONFIG.bossBulletSpeed, CONFIG.bossBulletRange, -0.32);
+          } else {
+            fireBullet(enemy, 'enemy', CONFIG.enemyBulletDamage, CONFIG.enemyBulletSpeed, CONFIG.enemyBulletRange, 0);
+          }
+        }
+      }
+    }
+
+    const defeated = enemies.filter(e => e.hp <= 0);
+    if (defeated.length > 0) {
+      for (const d of defeated) {
+        coins += d.boss ? 12 : 2;
+        sfxCoin();
+        for (let p = 0; p < (d.boss ? 20 : 8); p++) {
+          particles.push({
+            x: d.x, y: d.y,
+            vx: (Math.random() - 0.5) * 160, vy: (Math.random() - 0.5) * 160,
+            life: 0.35, maxLife: 0.35, color: "#facc15", r: 3.5
+          });
+        }
+      }
+      enemies = enemies.filter(e => e.hp > 0);
+      updateHud();
+    }
+
+    if (enemies.length === 0 && !inShop && !gameOver) {
+      advanceWaveOrLevel();
+    }
+  }
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    const stepDist = b.speed * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.distanceTraveled += stepDist;
+
+    if (b.distanceTraveled >= b.maxRange ||
+        b.x < 4 || b.x > canvas.width - 4 ||
+        b.y < 4 || b.y > canvas.height - 4) {
+      bullets.splice(i, 1);
+      continue;
+    }
+
+    let bulletHit = false;
+
+    if (currentMode === 'campaign') {
+      if (b.owner === 'p1') {
+        for (let j = 0; j < enemies.length; j++) {
+          const enemy = enemies[j];
+          if (Math.hypot(b.x - enemy.x, b.y - enemy.y) < b.radius + enemy.r) {
+            enemy.hp -= b.damage;
+            enemy.hitFlashTimer = CONFIG.hitFlashDuration;
+            sfxBulletHit();
+            spawnHitSpark(b.x, b.y, enemy.boss ? "#d8b4fe" : "#fda4af");
+            bullets.splice(i, 1);
+            bulletHit = true;
+            break;
+          }
+        }
+      } else if (b.owner === 'enemy' || b.owner === 'boss') {
+        if (Math.hypot(b.x - player1.x, b.y - player1.y) < b.radius + player1.r) {
+          player1.hp = Math.max(0, player1.hp - b.damage);
+          player1.hitFlashTimer = CONFIG.hitFlashDuration;
+          triggerDamageVignette();
+          sfxBulletHit();
+          spawnHitSpark(b.x, b.y, "#22c55e");
+          bullets.splice(i, 1);
+          bulletHit = true;
+
+          if (player1.hp <= 0) {
+            triggerGameOver(false, "You were shot down in Arena Level " + level + "!");
+          }
+          updateHud();
+        }
+      }
+    }
+
+    if (!bulletHit && currentMode === 'ai') {
+      if (b.owner === 'p1' && Math.hypot(b.x - botFighter.x, b.y - botFighter.y) < b.radius + botFighter.r) {
+        botFighter.hp = Math.max(0, botFighter.hp - 10);
+        botFighter.hitFlashTimer = CONFIG.hitFlashDuration;
+        sfxBulletHit();
+        spawnHitSpark(b.x, b.y, "#c084fc");
+        bullets.splice(i, 1);
+        bulletHit = true;
+
+        if (botFighter.hp <= 0) {
+          triggerGameOver(true, "Player 1 defeated the computer fighter on " + aiDifficulty.toUpperCase() + " difficulty!");
+        }
+        updateHud();
+      } else if (b.owner === 'bot' && Math.hypot(b.x - player1.x, b.y - player1.y) < b.radius + player1.r) {
+        player1.hp = Math.max(0, player1.hp - 8);
+        player1.hitFlashTimer = CONFIG.hitFlashDuration;
+        triggerDamageVignette();
+        sfxBulletHit();
+        spawnHitSpark(b.x, b.y, "#22c55e");
+        bullets.splice(i, 1);
+        bulletHit = true;
+
+        if (player1.hp <= 0) {
+          triggerGameOver(false, "The computer opponent defeated you in combat.");
+        }
+        updateHud();
+      }
+    }
+
+    if (!bulletHit && currentMode === 'local2p') {
+      if (b.owner === 'p1' && Math.hypot(b.x - player2.x, b.y - player2.y) < b.radius + player2.r) {
+        player2.hp = Math.max(0, player2.hp - 10);
+        player2.hitFlashTimer = CONFIG.hitFlashDuration;
+        sfxBulletHit();
+        spawnHitSpark(b.x, b.y, "#f59e0b");
+        bullets.splice(i, 1);
+        bulletHit = true;
+
+        if (player2.hp <= 0) {
+          triggerGameOver(true, "Player 1 (Green) has vanquished Player 2 in the arena!", "PLAYER 1 WINS!");
+        }
+        updateHud();
+      } else if (b.owner === 'p2' && Math.hypot(b.x - player1.x, b.y - player1.y) < b.radius + player1.r) {
+        player1.hp = Math.max(0, player1.hp - 10);
+        player1.hitFlashTimer = CONFIG.hitFlashDuration;
+        triggerDamageVignette();
+        sfxBulletHit();
+        spawnHitSpark(b.x, b.y, "#22c55e");
+        bullets.splice(i, 1);
+        bulletHit = true;
+
+        if (player1.hp <= 0) {
+          triggerGameOver(true, "Player 2 (Amber) has vanquished Player 1 in the arena!", "PLAYER 2 WINS!");
+        }
+        updateHud();
+      }
+    }
+
+    if (!bulletHit && currentMode === 'online') {
+      if (b.owner === 'p2' && Math.hypot(b.x - player1.x, b.y - player1.y) < b.radius + player1.r) {
+        player1.hp = Math.max(0, player1.hp - 10);
+        player1.hitFlashTimer = CONFIG.hitFlashDuration;
+        triggerDamageVignette();
+        sfxBulletHit();
+        spawnHitSpark(b.x, b.y, "#22c55e");
+        bullets.splice(i, 1);
+        bulletHit = true;
+
+        if (player1.hp <= 0) {
+          triggerGameOver(false, "Opponent won the match.");
+        }
+        updateHud();
+      }
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx * dt;
+    pt.y += pt.vy * dt;
+    pt.life -= dt;
+    if (pt.life <= 0) particles.splice(i, 1);
+  }
+
+  if (bannerTimer > 0) bannerTimer--;
+}
+
+function triggerDamageVignette() {
+  damageFlashEl.classList.add("active");
+  setTimeout(() => {
+    damageFlashEl.classList.remove("active");
+  }, 120);
+}
+
+function triggerGameOver(win, message, customTitle) {
+  gameOver = true;
+  sfxGameOver(win);
+  modalWinnerTitle.textContent = customTitle || (win ? "VICTORY!" : "GLADIATOR FALLEN");
+  modalWinnerTitle.style.color = win ? "#4ade80" : "#ef4444";
+  gameoverSummary.textContent = message;
+  gameoverModal.classList.add("active");
+}
+
+function spawnHitSpark(x, y, color) {
+  for (let p = 0; p < 6; p++) {
+    particles.push({
+      x: x, y: y,
+      vx: (Math.random() - 0.5) * 130,
+      vy: (Math.random() - 0.5) * 130,
+      life: 0.16, maxLife: 0.16,
+      color: color, r: 2.5
+    });
+  }
+}
+
+// Procedural Humanoid Drawing
+function drawHumanFighter(fighter, theme, label) {
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  const angle = Math.atan2(fighter.facingY, fighter.facingX);
+  ctx.rotate(angle);
+
+  let outfitColor = "#16a34a";
+  let vestColor = "#15803d";
+  let skinColor = "#fed7aa";
+  let helmetColor = "#14532d";
+  let gunColor = "#0f172a";
+  let visorColor = null;
+  let scale = CONFIG.soldierScale;
+
+  if (theme === 'player_green') {
+    outfitColor = "#16a34a";
+    vestColor = "#15803d";
+    helmetColor = "#14532d";
+    skinColor = "#fed7aa";
+    gunColor = "#1e293b";
+  } else if (theme === 'player_amber') {
+    outfitColor = "#d97706";
+    vestColor = "#b45309";
+    helmetColor = "#78350f";
+    skinColor = "#fed7aa";
+    gunColor = "#1e293b";
+  } else if (theme === 'enemy_dark') {
+    outfitColor = "#334155";
+    vestColor = "#1e293b";
+    helmetColor = "#0f172a";
+    skinColor = "#cbd5e1";
+    visorColor = "#ef4444";
+    gunColor = "#020617";
+  } else if (theme === 'boss_dark') {
+    outfitColor = "#475569";
+    vestColor = "#1e293b";
+    helmetColor = "#581c87";
+    skinColor = "#e2e8f0";
+    visorColor = "#c084fc";
+    gunColor = "#09090b";
+    scale = CONFIG.bossScale;
+  } else if (theme === 'bot_purple') {
+    outfitColor = "#7e22ce";
+    vestColor = "#581c87";
+    helmetColor = "#3b0764";
+    skinColor = "#fed7aa";
+    gunColor = "#1e293b";
+  }
+
+  if (fighter.hitFlashTimer && fighter.hitFlashTimer > 0) {
+    outfitColor = "#ffffff";
+    vestColor = "#f8fafc";
+    helmetColor = "#f1f5f9";
+  }
+
+  ctx.scale(scale, scale);
+
+  let recoilOffset = 0;
+  if (fighter.recoilTimer && fighter.recoilTimer > 0) {
+    recoilOffset = -3.5 * (fighter.recoilTimer / CONFIG.recoilDuration);
+  }
+
+  let leftBootStride = 0;
+  let rightBootStride = 0;
+  if (fighter.isMoving) {
+    const swing = Math.sin(fighter.walkTime) * 4.5;
+    leftBootStride = swing;
+    rightBootStride = -swing;
+  }
+
+  ctx.fillStyle = "#0f172a";
+  ctx.beginPath();
+  ctx.roundRect(-9 + leftBootStride, -8, 6.5, 4.2, 1.5);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(-9 + rightBootStride, 4, 6.5, 4.2, 1.5);
+  ctx.fill();
+
+  ctx.fillStyle = outfitColor;
+  ctx.beginPath();
+  ctx.roundRect(-6, -11, 12, 22, 4);
+  ctx.fill();
+
+  ctx.fillStyle = vestColor;
+  ctx.beginPath();
+  ctx.roundRect(-4, -9, 8, 18, 2.5);
+  ctx.fill();
+
+  ctx.fillStyle = outfitColor;
+  ctx.beginPath();
+  ctx.moveTo(0, -9);
+  ctx.lineTo(10 + recoilOffset, -5);
+  ctx.lineTo(10 + recoilOffset, -2);
+  ctx.lineTo(0, -6);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(0, 9);
+  ctx.lineTo(8 + recoilOffset, 5);
+  ctx.lineTo(8 + recoilOffset, 2);
+  ctx.lineTo(0, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = skinColor;
+  ctx.beginPath();
+  ctx.arc(10 + recoilOffset, -3.5, 2.2, 0, Math.PI * 2);
+  ctx.arc(8 + recoilOffset, 3.5, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = gunColor;
+  ctx.fillRect(4 + recoilOffset, -3, 8, 6);
+  const barrelLen = (theme === 'boss_dark' ? 14 : 10);
+  ctx.fillRect(12 + recoilOffset, -2, barrelLen, 4);
+
+  if (fighter.muzzleTimer && fighter.muzzleTimer > 0) {
+    const muzzleTipX = 12 + barrelLen + recoilOffset;
+    ctx.fillStyle = "#fef08a";
+    ctx.beginPath();
+    ctx.arc(muzzleTipX + 2, 0, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#f59e0b";
+    ctx.beginPath();
+    ctx.arc(muzzleTipX + 1, 0, 7.0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = helmetColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (visorColor) {
+    ctx.fillStyle = visorColor;
+    ctx.beginPath();
+    ctx.arc(3.5, 0, 3.2, -Math.PI / 2.2, Math.PI / 2.2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+    ctx.beginPath();
+    ctx.arc(2, 0, 3, -Math.PI / 2, Math.PI / 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Health Bar & Name Label above fighter
+  ctx.save();
+  const barW = (theme === 'boss_dark') ? 52 : 38;
+  const barH = 5;
+  const barX = fighter.x - barW / 2;
+  const barY = fighter.y - fighter.r * scale - 14;
+
+  ctx.fillStyle = "rgba(11, 17, 32, 0.85)";
+  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+  ctx.fillStyle = "rgba(30, 41, 59, 0.9)";
+  ctx.fillRect(barX, barY, barW, barH);
+
+  let barColor = "#22c55e";
+  if (theme === 'enemy_dark') barColor = "#ef4444";
+  else if (theme === 'boss_dark') barColor = "#a855f7";
+  else if (theme === 'player_amber') barColor = "#f59e0b";
+  else if (theme === 'bot_purple') barColor = "#c084fc";
+
+  ctx.fillStyle = barColor;
+  ctx.fillRect(barX, barY, Math.max(0, (fighter.hp / fighter.maxHp) * barW), barH);
+
+  if (label) {
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "700 10px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(label, fighter.x, barY - 4);
+  }
+
+  // Pre-Fire Aim Warning Telegraph
+  if (fighter.telegraphTimer && fighter.telegraphTimer > 0) {
+    ctx.save();
+    ctx.strokeStyle = (theme === 'boss_dark') ? "rgba(239, 68, 68, 0.85)" : "rgba(239, 68, 68, 0.6)";
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = (theme === 'boss_dark') ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fighter.x, fighter.y);
+    ctx.lineTo(fighter.x + fighter.facingX * 240, fighter.y + fighter.facingY * 240);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ef4444";
+    ctx.beginPath();
+    ctx.arc(fighter.x + fighter.facingX * (fighter.r + 10), fighter.y + fighter.facingY * (fighter.r + 10), 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawPlayerAimingLaser() {
+  if (gameOver || inShop || isPaused) return;
+
+  let targetX, targetY;
+  let nearestTarget = null;
+  let minDistance = CONFIG.laserRange;
+
+  if (currentMode === 'campaign') {
+    for (const enemy of enemies) {
+      const d = Math.hypot(enemy.x - player1.x, enemy.y - player1.y);
+      if (d < minDistance) {
+        minDistance = d;
+        nearestTarget = enemy;
+      }
+    }
+  } else if (currentMode === 'ai') {
+    const d = Math.hypot(botFighter.x - player1.x, botFighter.y - player1.y);
+    if (d < minDistance) {
+      nearestTarget = botFighter;
+    }
+  } else if (currentMode === 'local2p' || currentMode === 'online') {
+    const d = Math.hypot(player2.x - player1.x, player2.y - player1.y);
+    if (d < minDistance) {
+      nearestTarget = player2;
+    }
+  }
+
+  const gunMuzzleX = player1.x + player1.facingX * (player1.r * CONFIG.soldierScale + 6);
+  const gunMuzzleY = player1.y + player1.facingY * (player1.r * CONFIG.soldierScale + 6);
+
+  if (nearestTarget) {
+    targetX = nearestTarget.x;
+    targetY = nearestTarget.y;
+  } else {
+    targetX = gunMuzzleX + player1.facingX * 200;
+    targetY = gunMuzzleY + player1.facingY * 200;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = CONFIG.laserColor;
+  ctx.setLineDash(CONFIG.laserDash);
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(gunMuzzleX, gunMuzzleY);
+  ctx.lineTo(targetX, targetY);
+  ctx.stroke();
+
+  ctx.fillStyle = CONFIG.laserDotColor;
+  ctx.beginPath();
+  ctx.arc(targetX, targetY, CONFIG.laserDotRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (nearestTarget) {
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(targetX, targetY, nearestTarget.r + 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < canvas.width; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+
+  drawPlayerAimingLaser();
+
+  for (const pt of particles) {
+    ctx.fillStyle = pt.color;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const b of bullets) {
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius + 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (currentMode === 'campaign') {
+    for (const enemy of enemies) {
+      const label = enemy.boss ? "COMMANDER BOSS" : "";
+      drawHumanFighter(enemy, enemy.theme, label);
+    }
+  }
+
+  if (currentMode === 'local2p' || currentMode === 'online') {
+    drawHumanFighter(player2, 'player_amber', "P2 (Amber)");
+  }
+
+  if (currentMode === 'ai') {
+    drawHumanFighter(botFighter, 'bot_purple', "BOT (" + aiDifficulty.toUpperCase() + ")");
+  }
+
+  drawHumanFighter(player1, 'player_green', (currentMode === 'campaign' ? "YOU" : "P1 (Green)"));
+
+  if (bannerTimer > 0) {
+    ctx.save();
+    ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+    ctx.fillRect(canvas.width / 2 - 220, 18, 440, 42);
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(canvas.width / 2 - 220, 18, 440, 42);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "700 20px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(levelBanner, canvas.width / 2, 46);
+    ctx.restore();
+  }
+}
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastFrameTime) / 1000, 0.05);
+  lastFrameTime = timestamp;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+window.onload = () => {
+  resetGame();
+  lastFrameTime = performance.now();
+  requestAnimationFrame(gameLoop);
+};
+</script>
+</body>
+</html>
